@@ -16,13 +16,11 @@
   [sexpr]
   (let [sexpr (macroexpand sexpr)]
     ;; Only when things are interesting
-    (prn sexpr)
     (when (>= (count sexpr) 3)
       (let [third (fn [x] (first (rest (rest x))))
             fst (first sexpr)
             sec (second sexpr)
             thd (third sexpr)]
-        (prn thd)
         (cond
          ;; We found a def or defn
          (= 'def fst)
