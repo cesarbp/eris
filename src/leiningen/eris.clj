@@ -12,6 +12,30 @@
         (recur (read rdr))))
     (catch RuntimeException _)))
 
+(defn sexpr-type
+  [sexpr]
+  (let [sexpr (macroexpand sexpr)]
+    ;; Only when things are interesting
+    (prn sexpr)
+    (when (>= (count sexpr) 3)
+      (let [third (fn [x] (first (rest (rest x))))
+            fst (first sexpr)
+            sec (second sexpr)
+            thd (third sexpr)]
+        (prn thd)
+        (cond
+         ;; We found a def or defn
+         (= 'def fst)
+         [:def sexpr]
+         ;; We found a defmacro
+         (and (= 'do fst) (= 'clojure.core/defn (first sec))
+              (= 'setMacro (first (third thd))))
+         [:defmacro sexpr]
+         ;; We found a defmethod
+         (and (= '. fst) (= 'clojure.core/addMethod thd))
+         [:defmethod sexpr])))))
+
+(declare distort)
 (defn chaos
   [f]
   (with-open [in (PushbackReader. (io/reader f))]
@@ -23,10 +47,14 @@
             _ (swap! distorted conj `(in-ns '~ns-sym))]
         (try
           (loop [next-form (read in)]
-            ;; :-)
+            (swap! distorted
+                   (fn [form]
+                     (if-let [d (distort next-form)]
+                       (conj form d)
+                       form)))
             (recur (read in)))
           (catch RuntimeException _
-            @distorted))))))
+            (reverse @distorted)))))))
 
 (defn ls
   [^File dir]
