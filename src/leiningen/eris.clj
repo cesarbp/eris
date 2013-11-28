@@ -16,15 +16,17 @@
   [f]
   (with-open [in (PushbackReader. (io/reader f))]
     (when-let [ns-sym (get-ns in)]
-      (let [prefix-sym (fn [sym]
-                         (->> sym
-                              (str ns-sym "/")
-                              (symbol)))]
+      (let [distorted (atom '(do))
+            ;; Load namespace first
+            _ (swap! distorted conj `(require '~ns-sym))
+            ;; Then switch to it
+            _ (swap! distorted conj `(in-ns '~ns-sym))]
         (try
-          (loop [distorted (atom []) next-form (read in)]
+          (loop [next-form (read in)]
             ;; :-)
             (recur (read in)))
-          (catch RuntimeException))))))
+          (catch RuntimeException _
+            @distorted))))))
 
 (defn ls
   [^File dir]
