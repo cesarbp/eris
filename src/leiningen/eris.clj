@@ -1,6 +1,7 @@
 (ns leiningen.eris
   (:require [clojure.java.io :as io]
-            [clojure.test :as t])
+            [leiningen.core.eval :as eval]
+            [bultitude.core :as b])
   (:import [java.io File PushbackReader]))
 
 (defn third
@@ -161,7 +162,7 @@
   [f]
   (with-open [in (PushbackReader. (io/reader f))]
     (when-let [ns-sym (get-ns in)]
-      (let [distorted (atom '(do))
+      (let [distorted (atom ())
             ;; Load namespace first
             _ (swap! distorted conj `(require '~ns-sym))
             ;; Then switch to it
@@ -194,7 +195,25 @@
           (recur acc rst)))
       acc)))
 
+;; Yeah!
+(defn map-quote
+  "Map a quote"
+  [syms]
+  (map (fn [sym]
+         (concat '(quote) (list sym)))
+       syms))
 
 (defn eris
   [project & args]
-  )
+  (let [test-nses (b/namespaces-on-classpath
+                   :classpath (map io/file (:test-paths project)))
+        quoted (map-quote test-nses)
+        sources (mapcat source-files (:source-paths project))
+        chaos (mapcat chaos sources)
+        form (concat '(do) chaos
+                     `((apply clojure.test/run-tests '~test-nses)))]
+
+    (eval/eval-in-project project
+                          form
+                          `(require 'clojure.test
+                                    ~@quoted))))
